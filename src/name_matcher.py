@@ -4,7 +4,8 @@ import logging
 from typing import List, Optional, Tuple
 from pypinyin import lazy_pinyin
 import Levenshtein
-from config import LEVENSHTEIN_THRESHOLD, MATCH_PRIORITY
+from config import LEVENSHTEIN_THRESHOLD, MATCH_PRIORITY, ENABLE_STRUCTURED_LOGGING
+from src.structured_logger import StructuredLogger
 
 NAME_NOISE_WORDS = ["证券", "队伍", "实物", "成绩", "同学", "同学的", "的"]
 
@@ -27,6 +28,7 @@ class NameMatcher:
             student_names: List of student names from CSV
         """
         self.logger = logging.getLogger(__name__)
+        self.structured_logger = StructuredLogger(__name__)
         self.student_names = student_names
 
         # Pre-compute pinyin for all students for efficiency
@@ -50,10 +52,16 @@ class NameMatcher:
         return "".join(lazy_pinyin(name)).lower()
 
     def find_match(self, input_name: str) -> Tuple[Optional[str], Optional[str]]:
+        original_input = input_name
         input_name = self._clean_input_name(input_name)
 
         # 1. Exact Chinese
         if input_name in self.student_names:
+            if ENABLE_STRUCTURED_LOGGING:
+                self.structured_logger.log_name_match_exact(
+                    input_name=original_input,
+                    matched_name=input_name
+                )
             return input_name, "exact"
 
         input_pinyin = self._get_pinyin(input_name)
@@ -61,11 +69,25 @@ class NameMatcher:
         # 2. Exact pinyin
         for name, pinyin in self.name_to_pinyin.items():
             if input_pinyin == pinyin:
+                if ENABLE_STRUCTURED_LOGGING:
+                    self.structured_logger.log_name_match_pinyin_exact(
+                        input_name=original_input,
+                        input_pinyin=input_pinyin,
+                        matched_name=name,
+                        matched_pinyin=pinyin
+                    )
                 return name, "pinyin_exact"
 
         # 3. Pinyin contains (VERY IMPORTANT)
         for name, pinyin in self.name_to_pinyin.items():
             if input_pinyin.startswith(pinyin) or pinyin.startswith(input_pinyin):
+                if ENABLE_STRUCTURED_LOGGING:
+                    self.structured_logger.log_name_match_pinyin_contains(
+                        input_name=original_input,
+                        input_pinyin=input_pinyin,
+                        matched_name=name,
+                        matched_pinyin=pinyin
+                    )
                 return name, "pinyin_contains"
 
         # 4. Fuzzy pinyin
@@ -76,13 +98,47 @@ class NameMatcher:
                 candidates.append((name, dist))
 
         if not candidates:
+            # Get top 3 closest candidates for logging (even beyond threshold)
+            all_candidates = []
+            for name, pinyin in self.name_to_pinyin.items():
+                dist = Levenshtein.distance(input_pinyin, pinyin)
+                all_candidates.append((name, dist))
+            all_candidates.sort(key=lambda x: x[1])
+            top_candidates = all_candidates[:3]
+
+            if ENABLE_STRUCTURED_LOGGING:
+                self.structured_logger.log_name_match_fail(
+                    input_name=original_input,
+                    input_pinyin=input_pinyin,
+                    top_candidates=top_candidates
+                )
             return None, None
 
         candidates.sort(key=lambda x: x[1])
+
+        # Check for ambiguity
         if len(candidates) > 1 and candidates[0][1] == candidates[1][1]:
+            # Multiple equal-distance candidates
+            ambiguous_candidates = [c for c in candidates if c[1] == candidates[0][1]]
+            if ENABLE_STRUCTURED_LOGGING:
+                self.structured_logger.log_name_match_ambiguous(
+                    input_name=original_input,
+                    input_pinyin=input_pinyin,
+                    candidates=ambiguous_candidates
+                )
             return None, "ambiguous"
 
-        return candidates[0][0], "pinyin_fuzzy"
+        # Successful fuzzy match - log ALL candidates, not just the winner
+        matched_name = candidates[0][0]
+        if ENABLE_STRUCTURED_LOGGING:
+            self.structured_logger.log_name_match_fuzzy(
+                input_name=original_input,
+                input_pinyin=input_pinyin,
+                matched_name=matched_name,
+                all_candidates=candidates  # Log ALL candidates
+            )
+
+        return matched_name, "pinyin_fuzzy"
 
     def find_all_similar(
         self, input_name: str, max_distance: int = 2

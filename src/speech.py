@@ -8,8 +8,10 @@ from config import (
     LANGUAGE,
     ENERGY_THRESHOLD,
     PAUSE_THRESHOLD,
-    PHRASE_TIME_LIMIT
+    PHRASE_TIME_LIMIT,
+    ENABLE_STRUCTURED_LOGGING
 )
+from src.structured_logger import StructuredLogger
 
 
 class ContinuousSpeechRecognizer:
@@ -28,6 +30,7 @@ class ContinuousSpeechRecognizer:
         self.recognizer = sr.Recognizer()
         self.microphone = sr.Microphone()
         self.logger = logging.getLogger(__name__)
+        self.structured_logger = StructuredLogger(__name__)
         self.is_listening = False
         self.stop_listening = None
 
@@ -63,6 +66,14 @@ class ContinuousSpeechRecognizer:
         try:
             text = self.recognizer.recognize_google(audio, language=LANGUAGE)
             self.logger.info(f"Recognized: {text}")
+
+            # Structured logging: ASR output
+            if ENABLE_STRUCTURED_LOGGING:
+                self.structured_logger.log_asr_output(
+                    raw_input=text,
+                    engine=SPEECH_ENGINE
+                )
+
             return text
         except sr.UnknownValueError:
             self.logger.debug("Speech not understood")

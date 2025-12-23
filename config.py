@@ -20,9 +20,11 @@ MATCH_PRIORITY = {
 }
 
 # Logging Configuration
-LOG_FILE = "logs/voice_marking.log"
+LOG_DIR = "logs"
+LOG_FILE_PREFIX = "voice_marking"  # Will be formatted as: voice_marking-YYYY-MM-DD.log
 LOG_LEVEL = "INFO"
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+ENABLE_STRUCTURED_LOGGING = True  # Enable JSON structured logging
 
 # Parser Configuration
 CORRECT_KEYWORDS = ["对", "正确"]

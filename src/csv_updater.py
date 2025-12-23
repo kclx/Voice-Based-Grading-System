@@ -5,9 +5,10 @@ import logging
 import os
 from typing import List, Optional
 from threading import Lock
-from config import CSV_FILE_PATH, CSV_COLUMNS
+from config import CSV_FILE_PATH, CSV_COLUMNS, ENABLE_STRUCTURED_LOGGING
 from src.parser import GradeEntry
 from src.utils import validate_csv_structure
+from src.structured_logger import StructuredLogger
 
 
 class CSVUpdater:
@@ -30,6 +31,7 @@ class CSVUpdater:
         """
         self.csv_path = csv_path
         self.logger = logging.getLogger(__name__)
+        self.structured_logger = StructuredLogger(__name__)
         self.lock = Lock()  # Thread safety for concurrent updates
         self.df = None
 
@@ -113,6 +115,13 @@ class CSVUpdater:
 
                 if len(student_idx) == 0:
                     self.logger.error(f"Student not found in CSV: '{entry.name}'")
+
+                    # Structured logging: CSV update failure
+                    if ENABLE_STRUCTURED_LOGGING:
+                        self.structured_logger.log_csv_update_fail(
+                            student_name=entry.name,
+                            reason="student_not_found"
+                        )
                     return False
 
                 if len(student_idx) > 1:
@@ -123,6 +132,10 @@ class CSVUpdater:
                 # Get old values for logging
                 old_correct = int(self.df.loc[idx, 'correct'])
                 old_wrong = int(self.df.loc[idx, 'wrong'])
+
+                # Calculate deltas
+                correct_delta = entry.correct - old_correct
+                wrong_delta = entry.wrong - old_wrong
 
                 # Update values
                 self.df.loc[idx, 'correct'] = entry.correct
@@ -137,10 +150,27 @@ class CSVUpdater:
                     f"wrong {old_wrong}->{entry.wrong}"
                 )
 
+                # Structured logging: CSV update success
+                if ENABLE_STRUCTURED_LOGGING:
+                    self.structured_logger.log_csv_update_success(
+                        student_name=entry.name,
+                        correct_delta=correct_delta,
+                        wrong_delta=wrong_delta,
+                        new_correct=entry.correct,
+                        new_wrong=entry.wrong
+                    )
+
                 return True
 
             except Exception as e:
                 self.logger.error(f"Failed to update student '{entry.name}': {e}")
+
+                # Structured logging: CSV update failure
+                if ENABLE_STRUCTURED_LOGGING:
+                    self.structured_logger.log_csv_update_fail(
+                        student_name=entry.name,
+                        reason=f"exception: {str(e)}"
+                    )
                 return False
 
     def create_backup(self, backup_suffix: str = None):

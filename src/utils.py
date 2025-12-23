@@ -2,30 +2,39 @@
 
 import logging
 import os
-from typing import Optional
-from config import LOG_FILE, LOG_LEVEL, LOG_FORMAT
+from datetime import datetime
+from typing import Optional, List
+from config import LOG_DIR, LOG_FILE_PREFIX, LOG_LEVEL, LOG_FORMAT, ENABLE_STRUCTURED_LOGGING
 
 
 def setup_logging() -> logging.Logger:
     """
-    Set up logging configuration for the application.
+    Set up logging configuration for the application with daily rotation.
 
     Returns:
         logging.Logger: Configured logger instance
     """
     # Create logs directory if it doesn't exist
-    os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+    os.makedirs(LOG_DIR, exist_ok=True)
+
+    # Generate daily log file name: voice_marking-YYYY-MM-DD.log
+    today = datetime.now().strftime("%Y-%m-%d")
+    log_file = os.path.join(LOG_DIR, f"{LOG_FILE_PREFIX}-{today}.log")
 
     # Configure logging
     logging.basicConfig(
         level=getattr(logging, LOG_LEVEL),
         format=LOG_FORMAT,
         handlers=[
-            logging.FileHandler(LOG_FILE, encoding='utf-8'),
+            logging.FileHandler(log_file, encoding='utf-8'),
             logging.StreamHandler()
         ]
     )
-    return logging.getLogger(__name__)
+
+    logger = logging.getLogger(__name__)
+    logger.info(f"Logging initialized - File: {log_file}, Structured: {ENABLE_STRUCTURED_LOGGING}")
+
+    return logger
 
 
 def validate_csv_structure(df, required_columns: list) -> bool:
@@ -42,17 +51,29 @@ def validate_csv_structure(df, required_columns: list) -> bool:
     return all(col in df.columns for col in required_columns)
 
 
-def normalize_chinese_text(text: str) -> str:
+def normalize_chinese_text(text: str, track_removed: bool = False) -> tuple[str, List[str]] | str:
     """
     Normalize Chinese text by removing extra spaces and standardizing format.
 
     Args:
         text: Input text
+        track_removed: If True, return (normalized_text, removed_tokens)
 
     Returns:
-        str: Normalized text
+        str or tuple: Normalized text, or (normalized_text, removed_tokens) if track_removed=True
     """
-    return ' '.join(text.split())
+    # For now, simple whitespace normalization
+    # Future: could track specific removed tokens
+    normalized = ' '.join(text.split())
+
+    if track_removed:
+        # Calculate what was removed (simplified - just extra spaces for now)
+        removed = []
+        if text != normalized:
+            removed.append("extra_whitespace")
+        return normalized, removed
+
+    return normalized
 
 
 def safe_int_conversion(value: str) -> Optional[int]:
