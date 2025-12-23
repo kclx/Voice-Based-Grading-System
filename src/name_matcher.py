@@ -6,6 +6,8 @@ from pypinyin import lazy_pinyin
 import Levenshtein
 from config import LEVENSHTEIN_THRESHOLD, MATCH_PRIORITY
 
+NAME_NOISE_WORDS = ["证券", "队伍", "实物", "成绩", "同学", "同学的", "的"]
+
 
 class NameMatcher:
     """
@@ -28,9 +30,7 @@ class NameMatcher:
         self.student_names = student_names
 
         # Pre-compute pinyin for all students for efficiency
-        self.name_to_pinyin = {
-            name: self._get_pinyin(name) for name in student_names
-        }
+        self.name_to_pinyin = {name: self._get_pinyin(name) for name in student_names}
 
         self.logger.info(f"Initialized NameMatcher with {len(student_names)} students")
 
@@ -47,67 +47,46 @@ class NameMatcher:
         """
         # Use lazy_pinyin to get pinyin without tones
         # Join without spaces for easier matching
-        return ''.join(lazy_pinyin(name)).lower()
+        return "".join(lazy_pinyin(name)).lower()
 
     def find_match(self, input_name: str) -> Tuple[Optional[str], Optional[str]]:
-        """
-        Find the best match for input name using priority-based matching.
+        input_name = self._clean_input_name(input_name)
 
-        Args:
-            input_name: Name to match (from speech recognition)
-
-        Returns:
-            Tuple[Optional[str], Optional[str]]: (matched_name, match_type) or (None, None)
-            match_type can be: 'exact', 'pinyin_exact', 'pinyin_fuzzy', or None
-        """
-        # Priority 1: Exact match
+        # 1. Exact Chinese
         if input_name in self.student_names:
-            self.logger.info(f"Exact match found: '{input_name}'")
-            return input_name, 'exact'
+            return input_name, "exact"
 
-        # Priority 2: Exact pinyin match
         input_pinyin = self._get_pinyin(input_name)
+
+        # 2. Exact pinyin
         for name, pinyin in self.name_to_pinyin.items():
             if input_pinyin == pinyin:
-                self.logger.info(f"Exact pinyin match: '{input_name}' -> '{name}'")
-                return name, 'pinyin_exact'
+                return name, "pinyin_exact"
 
-        # Priority 3: Fuzzy pinyin match
+        # 3. Pinyin contains (VERY IMPORTANT)
+        for name, pinyin in self.name_to_pinyin.items():
+            if input_pinyin.startswith(pinyin) or pinyin.startswith(input_pinyin):
+                return name, "pinyin_contains"
+
+        # 4. Fuzzy pinyin
         candidates = []
         for name, pinyin in self.name_to_pinyin.items():
-            distance = Levenshtein.distance(input_pinyin, pinyin)
-            if distance <= LEVENSHTEIN_THRESHOLD:
-                candidates.append((name, distance))
+            dist = Levenshtein.distance(input_pinyin, pinyin)
+            if dist <= 2:
+                candidates.append((name, dist))
 
-        if candidates:
-            # Sort by distance (lower is better)
-            candidates.sort(key=lambda x: x[1])
+        if not candidates:
+            return None, None
 
-            # Check for multiple matches with same distance
-            best_distance = candidates[0][1]
-            best_matches = [c for c in candidates if c[1] == best_distance]
+        candidates.sort(key=lambda x: x[1])
+        if len(candidates) > 1 and candidates[0][1] == candidates[1][1]:
+            return None, "ambiguous"
 
-            if len(best_matches) > 1:
-                # Multiple equally good matches - ambiguous
-                names = [m[0] for m in best_matches]
-                self.logger.warning(
-                    f"Ambiguous fuzzy match for '{input_name}': {names}. "
-                    f"Distance: {best_distance}"
-                )
-                return None, 'ambiguous'
+        return candidates[0][0], "pinyin_fuzzy"
 
-            matched_name = candidates[0][0]
-            self.logger.info(
-                f"Fuzzy pinyin match: '{input_name}' -> '{matched_name}' "
-                f"(distance: {best_distance})"
-            )
-            return matched_name, 'pinyin_fuzzy'
-
-        # No match found
-        self.logger.warning(f"No match found for: '{input_name}'")
-        return None, None
-
-    def find_all_similar(self, input_name: str, max_distance: int = 2) -> List[Tuple[str, int]]:
+    def find_all_similar(
+        self, input_name: str, max_distance: int = 2
+    ) -> List[Tuple[str, int]]:
         """
         Find all similar names for debugging or user feedback.
 
@@ -137,7 +116,11 @@ class NameMatcher:
             new_names: Updated list of student names
         """
         self.student_names = new_names
-        self.name_to_pinyin = {
-            name: self._get_pinyin(name) for name in new_names
-        }
+        self.name_to_pinyin = {name: self._get_pinyin(name) for name in new_names}
         self.logger.info(f"Updated student list: {len(new_names)} students")
+
+    def _clean_input_name(self, name: str) -> str:
+        cleaned = name
+        for noise in NAME_NOISE_WORDS:
+            cleaned = cleaned.replace(noise, "")
+        return cleaned.strip()

@@ -7,12 +7,12 @@ CSV_COLUMNS = ["name", "correct", "wrong"]
 # Speech Recognition Configuration
 SPEECH_ENGINE = "google"  # Using Google Speech Recognition
 LANGUAGE = "zh-CN"  # Chinese (Simplified)
-ENERGY_THRESHOLD = 4000  # Adjust based on classroom noise
-PAUSE_THRESHOLD = 0.8  # Seconds of silence before considering phrase complete
+ENERGY_THRESHOLD = 1000  # Adjust based on classroom noise
+PAUSE_THRESHOLD = 2  # Seconds of silence before considering phrase complete
 PHRASE_TIME_LIMIT = 5  # Maximum seconds for a single phrase
 
 # Name Matching Configuration
-LEVENSHTEIN_THRESHOLD = 1  # Maximum edit distance for fuzzy matching
+LEVENSHTEIN_THRESHOLD = 2  # Maximum edit distance for fuzzy matching
 MATCH_PRIORITY = {
     "exact": 1,
     "pinyin_exact": 2,
