@@ -4,7 +4,7 @@ import logging
 from typing import List, Optional, Tuple
 from pypinyin import lazy_pinyin
 import Levenshtein
-from config import LEVENSHTEIN_THRESHOLD, MATCH_PRIORITY, ENABLE_STRUCTURED_LOGGING
+from config import ENABLE_STRUCTURED_LOGGING
 from src.structured_logger import StructuredLogger
 
 NAME_NOISE_WORDS = ["证券", "队伍", "实物", "成绩", "同学", "同学的", "的"]
@@ -59,8 +59,7 @@ class NameMatcher:
         if input_name in self.student_names:
             if ENABLE_STRUCTURED_LOGGING:
                 self.structured_logger.log_name_match_exact(
-                    input_name=original_input,
-                    matched_name=input_name
+                    input_name=original_input, matched_name=input_name
                 )
             return input_name, "exact"
 
@@ -74,7 +73,7 @@ class NameMatcher:
                         input_name=original_input,
                         input_pinyin=input_pinyin,
                         matched_name=name,
-                        matched_pinyin=pinyin
+                        matched_pinyin=pinyin,
                     )
                 return name, "pinyin_exact"
 
@@ -86,7 +85,7 @@ class NameMatcher:
                         input_name=original_input,
                         input_pinyin=input_pinyin,
                         matched_name=name,
-                        matched_pinyin=pinyin
+                        matched_pinyin=pinyin,
                     )
                 return name, "pinyin_contains"
 
@@ -110,7 +109,7 @@ class NameMatcher:
                 self.structured_logger.log_name_match_fail(
                     input_name=original_input,
                     input_pinyin=input_pinyin,
-                    top_candidates=top_candidates
+                    top_candidates=top_candidates,
                 )
             return None, None
 
@@ -124,7 +123,7 @@ class NameMatcher:
                 self.structured_logger.log_name_match_ambiguous(
                     input_name=original_input,
                     input_pinyin=input_pinyin,
-                    candidates=ambiguous_candidates
+                    candidates=ambiguous_candidates,
                 )
             return None, "ambiguous"
 
@@ -135,7 +134,7 @@ class NameMatcher:
                 input_name=original_input,
                 input_pinyin=input_pinyin,
                 matched_name=matched_name,
-                all_candidates=candidates  # Log ALL candidates
+                all_candidates=candidates,  # Log ALL candidates
             )
 
         return matched_name, "pinyin_fuzzy"

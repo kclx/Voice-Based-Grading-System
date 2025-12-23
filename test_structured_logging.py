@@ -1,12 +1,12 @@
 """Test script to validate structured logging instrumentation."""
 
-import json
 import sys
 from src.utils import setup_logging
 from src.structured_logger import StructuredLogger
 from src.parser import SpeechParser, GradeEntry
 from src.name_matcher import NameMatcher
 from src.csv_updater import CSVUpdater
+
 
 def test_logging():
     """Test all structured logging functions."""
@@ -20,10 +20,7 @@ def test_logging():
     # Test 1: ASR Output
     print("\n[1] Testing ASR Output Logging...")
     s_logger = StructuredLogger("test_asr")
-    s_logger.log_asr_output(
-        raw_input="杨洋同学 对 18 错 2",
-        engine="google"
-    )
+    s_logger.log_asr_output(raw_input="杨洋同学 对 18 错 2", engine="google")
     print("✓ ASR output logged")
 
     # Test 2: Text Normalization
@@ -98,7 +95,10 @@ def test_logging():
     print("\nTo view structured logs:")
     print("  cat logs/voice_marking-$(date +%Y-%m-%d).log | grep '{\"timestamp\"'")
     print("\nTo parse and pretty-print JSON logs:")
-    print("  cat logs/voice_marking-$(date +%Y-%m-%d).log | grep '{\"timestamp\"' | jq .")
+    print(
+        "  cat logs/voice_marking-$(date +%Y-%m-%d).log | grep '{\"timestamp\"' | jq ."
+    )
+
 
 if __name__ == "__main__":
     try:
@@ -106,5 +106,6 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n✗ Test failed with error: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
